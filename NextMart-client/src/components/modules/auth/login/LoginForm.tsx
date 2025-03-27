@@ -11,25 +11,28 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
-import React from "react";
+import React, { useState } from "react";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
-import { registrationSchema } from "./registerValidation";
-import { registerUser } from "@/services/AuthService";
+import { loginUser, reCaptchaTokenVerification } from "@/services/AuthService";
 import { toast } from "sonner";
+import { loginSchema } from "./loginValidation";
+import Link from "next/link";
+import ReCAPTCHA from "react-google-recaptcha";
 
-const RegisterForm = () => {
+const LoginForm = () => {
   const form = useForm({
-    resolver: zodResolver(registrationSchema),
+    resolver: zodResolver(loginSchema),
   });
 
-  const {formState: {isSubmitting}} = form;
+  const {
+    formState: { isSubmitting },
+  } = form;
 
-  const password = form.watch("password");
-  const confirmPassword = form.watch("confirmPassword");
+  const [reCaptchaStatus, setReCaptchaStatus] = useState(false);
 
   const onSubmit: SubmitHandler<FieldValues> = async (data) => {
     try {
-      const res = await registerUser(data);
+      const res = await loginUser(data);
       console.log(res);
       if (res?.success) {
         toast.success(res?.message);
@@ -38,6 +41,21 @@ const RegisterForm = () => {
       }
     } catch (error: any) {
       console.error(error);
+    }
+  };
+
+  const handleRecaptcha = async (value: string | null) => {
+    console.log(value);
+    try {
+      const res = await reCaptchaTokenVerification(value!);
+
+      if (res?.success) {
+        setReCaptchaStatus(true);
+      }
+
+      console.log("res", res);
+    } catch (error: any) {
+      throw Error(error);
     }
   };
 
@@ -50,18 +68,6 @@ const RegisterForm = () => {
         </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-            <label>Name</label>
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel />
-                  <Input {...field} value={field.value || ""} />
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <label>Email</label>
             <FormField
               control={form.control}
@@ -86,33 +92,23 @@ const RegisterForm = () => {
                 </FormItem>
               )}
             />
-            <label>Confirm Password</label>
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel />
-                  <Input {...field} value={field.value || ""} />
-                  {confirmPassword && password !== confirmPassword ? (
-                    <FormMessage>Password Dose not match</FormMessage>
-                  ) : (
-                    <FormMessage />
-                  )}
-                </FormItem>
-              )}
+            <ReCAPTCHA
+              sitekey={process.env.NEXT_PUBLIC_RECHAPCHA_CLIENT_KEY!}
+              onChange={handleRecaptcha}
             />
-
+            ,
             <Button
-              disabled={!!confirmPassword && password !== confirmPassword}
+              disabled={reCaptchaStatus ? false : true}
               type="submit"
               className="w-full my-5 bg-purple-500 hover:bg-purple-600 cursor-pointer"
-            >{isSubmitting ? "Registering...": "Register"}
-              
+            >
+              {isSubmitting ? "Logging in..." : "Login"}
             </Button>
             <p className="text-center">
-              Already have an account?{" "}
-              <span className="text-purple-500 font-semibold">Login</span>
+              Do not have an account?{" "}
+              <Link href="/register">
+                <span className="text-purple-500 font-semibold">Register</span>
+              </Link>
             </p>
           </form>
         </Form>
@@ -121,4 +117,4 @@ const RegisterForm = () => {
   );
 };
 
-export default RegisterForm;
+export default LoginForm;
